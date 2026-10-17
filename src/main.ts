@@ -15,9 +15,15 @@ import {
   toggleDie,
   type GameState,
 } from "./game";
-import { playFarkleSound } from "./audio";
+import {
+  playBankSound,
+  playComboSound,
+  playFarkleSound,
+  startDiceRollSound,
+  stopDiceRollSound,
+} from "./audio";
 import { farkleAutoMs, isFast, rollFaces } from "./random";
-import { formatPoints, OPENING_SCORE, SCORING_TABLE, scoringHints, WINNING_SCORE } from "./rules";
+import { bestAvailableScore, formatPoints, OPENING_SCORE, SCORING_TABLE, scoringHints, WINNING_SCORE } from "./rules";
 
 const root = document.querySelector("#app");
 if (!(root instanceof HTMLElement)) throw new Error("Missing #app");
@@ -35,6 +41,8 @@ const ui = {
 let rollGen = 0;
 let farkleShowTimer = 0;
 let farkleAutoTimer = 0;
+/** Avoid repeating the same combo cue back-to-back (land vs select). */
+let lastComboCuePoints = 0;
 
 function clearFarkleTimers(): void {
   window.clearTimeout(farkleShowTimer);
@@ -451,9 +459,11 @@ function runAnimation(finalValues: number[], done: () => void): void {
   render();
   const started = performance.now();
   const duration = motion(880, 50);
+  startDiceRollSound(duration);
   const tick = window.setInterval(() => {
     if (gen !== rollGen) {
       window.clearInterval(tick);
+      stopDiceRollSound();
       return;
     }
     ui.preview = finalValues.map(() => 1 + Math.floor(Math.random() * 6));
@@ -464,11 +474,30 @@ function runAnimation(finalValues: number[], done: () => void): void {
     if (performance.now() - started < duration) return;
     window.clearInterval(tick);
     if (gen !== rollGen) return;
+    stopDiceRollSound();
     ui.rolling = false;
     ui.preview = null;
     done();
     render();
   }, motion(70, 20));
+}
+
+function cueCombo(points: number): void {
+  if (!Number.isFinite(points) || points <= 0 || points === lastComboCuePoints) return;
+  lastComboCuePoints = points;
+  playComboSound(points);
+}
+
+function playLandedCombo(values: number[]): void {
+  lastComboCuePoints = 0;
+  if (state.phase !== "select") return;
+  const best = bestAvailableScore(values);
+  if (best) cueCombo(best.points);
+}
+
+function playSelectionCombo(): void {
+  const selection = selectionView(state);
+  if (selection.legal) cueCombo(selection.points);
 }
 
 function onStartRoll(): void {
@@ -483,6 +512,7 @@ function onStartRoll(): void {
   }
   runAnimation(values, () => {
     state = applyRoll(state, values);
+    playLandedCombo(values);
     afterLanding();
   });
 }
@@ -501,6 +531,7 @@ function onCommitRoll(): void {
   state = next;
   runAnimation(values, () => {
     state = applyRoll(state, values);
+    playLandedCombo(values);
     afterLanding();
   });
 }
@@ -522,7 +553,9 @@ function onRollOff(): void {
 
 function onBank(): void {
   if (ui.rolling || !canBank(state).ok) return;
+  const opening = !state.players[state.current]?.onBoard;
   clearFarkleTimers();
+  playBankSound(opening);
   state = bank(state);
   ui.farkleOn = false;
   ui.error = "";
@@ -549,6 +582,7 @@ function onClick(event: MouseEvent): void {
     if (ui.rolling || state.phase !== "select") return;
     state = toggleDie(state, Number(die.dataset.dieId));
     ui.error = "";
+    playSelectionCombo();
     render();
     return;
   }
@@ -605,6 +639,7 @@ function onClick(event: MouseEvent): void {
     if (ui.rolling || !canSelectScoringDice(state)) return;
     state = selectScoringDice(state);
     ui.error = "";
+    playSelectionCombo();
     render();
     return;
   }
@@ -614,6 +649,7 @@ function onClick(event: MouseEvent): void {
   }
   if (action === "again") {
     clearFarkleTimers();
+    stopDiceRollSound();
     state = createGame();
     ui.farkleOn = false;
     ui.rulesOpen = false;

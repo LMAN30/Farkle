@@ -64,6 +64,12 @@ test("highlights scoring dice, commits on roll or bank, and shakes on a Farkle",
   await expect(tray.locator("[data-value='2']")).toHaveAttribute("data-hint", "false");
   await expect(page.getByTestId("turn-score")).toHaveText("0");
   await expect(page.getByTestId("select-scoring")).toBeEnabled();
+  const sounds = await page.evaluate(() => {
+    const w = window as unknown as { __FARKLE_ROLL_SOUND?: number; __FARKLE_COMBO_SOUND?: number };
+    return { roll: w.__FARKLE_ROLL_SOUND ?? 0, combo: w.__FARKLE_COMBO_SOUND ?? 0 };
+  });
+  expect(sounds.roll).toBeGreaterThan(0);
+  expect(sounds.combo).toBeGreaterThan(0);
   await page.screenshot({ path: "/tmp/farkle-shots/hints.png" });
 
   await tray.locator("[data-value='1']").first().click();
@@ -116,6 +122,12 @@ test("highlights scoring dice, commits on roll or bank, and shakes on a Farkle",
 
   await expect(page.locator("[data-name='Ada'] [data-testid='score-value']")).toHaveText("1,150");
   await expect(page.getByTestId("current-player")).toContainText("Bo");
+  const openingBank = await page.evaluate(() => {
+    const w = window as unknown as { __FARKLE_OPENING_BANK_SOUND?: number; __FARKLE_BANK_SOUND?: number };
+    return { opening: w.__FARKLE_OPENING_BANK_SOUND ?? 0, bank: w.__FARKLE_BANK_SOUND ?? 0 };
+  });
+  expect(openingBank.opening).toBeGreaterThan(0);
+  expect(openingBank.bank).toBe(0);
   await page.screenshot({ path: "/tmp/farkle-shots/banked.png" });
 
   await queue(page, [2, 3, 4, 6, 2, 3]);

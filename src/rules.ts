@@ -149,3 +149,10 @@ export function scoringHints(dice: number[]): boolean[] {
 export function hasScoringOption(dice: number[]): boolean {
   return scoringHints(dice).some(Boolean);
 }
+
+/** Score from keeping every die that can score on this roll. */
+export function bestAvailableScore(dice: number[]): ScoreResult | null {
+  const hints = scoringHints(dice);
+  const kept = dice.filter((_, index) => hints[index]);
+  return scoreSelection(kept);
+}
