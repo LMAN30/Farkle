@@ -4,9 +4,15 @@
   box-sizing: border-box;
 }
 
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   color: #f7f1e6;
   font-family: "Avenir Next", "Segoe UI", sans-serif;
   background-color: #3a2718;
@@ -15,6 +21,14 @@ body {
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 11px),
     linear-gradient(180deg, #6a4a30 0%, #3d291b 42%, #24160e 100%);
   background-attachment: fixed;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  padding:
+    env(safe-area-inset-top, 0px)
+    env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
 }
 
 body.is-farkle {
@@ -24,6 +38,10 @@ body.is-farkle {
 button,
 input {
   font: inherit;
+}
+
+button {
+  touch-action: manipulation;
 }
 
 :focus-visible {
@@ -44,13 +62,38 @@ input {
 }
 
 .shell {
-  width: min(1040px, calc(100% - 40px));
+  width: min(1040px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 22px 0 56px;
+  padding: 22px 0 calc(56px + env(safe-area-inset-bottom, 0px));
 }
 
 .top {
   padding: 4px 72px 12px 0;
+}
+
+.install-hint {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(247, 241, 230, 0.94);
+  color: #1c1712;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.install-hint p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.install-hint .install-dismiss {
+  flex: none;
+  color: #8a5a12;
+  white-space: nowrap;
 }
 
 h1,
@@ -83,8 +126,8 @@ h2 {
 
 .rules-button {
   position: fixed;
-  top: 18px;
-  right: 18px;
+  top: calc(18px + env(safe-area-inset-top, 0px));
+  right: calc(18px + env(safe-area-inset-right, 0px));
   z-index: 30;
   width: 52px;
   height: 52px;
@@ -622,7 +665,7 @@ div.die {
 .farkle-continue {
   position: absolute;
   left: 50%;
-  bottom: 32px;
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
   z-index: 2;
   transform: translateX(-50%);
   background: #fff;
@@ -668,10 +711,56 @@ div.die {
 }
 
 @media (max-width: 720px) {
+  .shell {
+    width: min(1040px, calc(100% - 24px));
+    padding-top: 12px;
+  }
+
   h1 { font-size: 42px; }
+  h2 { font-size: 28px; }
+
   .die { width: 64px; height: 64px; }
   .die i { width: 12px; height: 12px; }
+  .dice { gap: 12px; min-height: 96px; }
   .turn-score-block strong { font-size: 36px; }
   .farkle-word { font-size: 16vw; }
   .rules-grid { grid-template-columns: 1fr; }
+
+  .panel {
+    padding: 20px 18px;
+    margin: 12px auto;
+  }
+
+  .actions {
+    gap: 10px;
+  }
+
+  .primary,
+  .secondary,
+  .farkle-continue {
+    min-height: 48px;
+    padding: 14px 18px;
+    font-size: 17px;
+  }
+
+  .modal-back {
+    padding: 12px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+
+  .modal {
+    max-height: min(92dvh, 860px);
+    border-radius: 16px;
+    padding: 18px 16px 22px;
+  }
+
+  .player-points {
+    font-size: 28px;
+  }
+}
+
+@media (display-mode: standalone) {
+  .shell {
+    padding-top: 8px;
+  }
 }
