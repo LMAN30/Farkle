@@ -135,6 +135,12 @@ test("highlights scoring dice, commits on roll or bank, and shakes on a Farkle",
   await expect(page.locator("[data-name='Bo'] [data-testid='score-value']")).toHaveText("0");
   await expect(page.locator("[data-name='Ada'] [data-testid='score-value']")).toHaveText("1,150");
   await page.screenshot({ path: "/tmp/farkle-shots/farkle.png" });
+  await expect(page.getByTestId("farkle-continue")).toContainText("auto in 2s");
+  const soundCount = await page.evaluate(() => {
+    const w = window as unknown as { __FARKLE_SOUND_PLAYED?: number };
+    return w.__FARKLE_SOUND_PLAYED ?? 0;
+  });
+  expect(soundCount).toBeGreaterThan(0);
   await page.getByTestId("farkle-continue").click();
   await expect(page.getByTestId("current-player")).toContainText("Ada");
 
@@ -175,4 +181,17 @@ test("hot dice keeps the turn score and 10000 starts the last round", async ({ p
   await expect(page.getByTestId("current-player")).toContainText("Bo");
   await expect(page.locator("[data-name='Ada'] [data-testid='score-value']")).toHaveText("12,000");
   await page.screenshot({ path: "/tmp/farkle-shots/last-round.png" });
+});
+
+test("farkle overlay auto-advances after the hold delay", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { __FARKLE_AUTO_MS: number }).__FARKLE_AUTO_MS = 200;
+  });
+  await startMatch(page, ["Ada", "Bo"]);
+  await queue(page, [2, 3, 4, 6, 2, 3]);
+  await page.getByTestId("roll-button").click();
+  const overlay = page.getByTestId("farkle-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toBeHidden({ timeout: 5_000 });
+  await expect(page.getByTestId("current-player")).toContainText("Bo");
 });

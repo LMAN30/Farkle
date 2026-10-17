@@ -1,6 +1,8 @@
 interface FarkleTestHooks {
   __FARKLE_QUEUE?: number[];
   __FARKLE_FAST?: boolean;
+  /** Override Farkle overlay auto-dismiss delay in ms (tests). */
+  __FARKLE_AUTO_MS?: number;
 }
 
 function hooks(): FarkleTestHooks {
@@ -9,6 +11,13 @@ function hooks(): FarkleTestHooks {
 
 export function isFast(): boolean {
   return Boolean(hooks().__FARKLE_FAST);
+}
+
+/** How long the Farkle overlay stays up before advancing. Default 2 seconds. */
+export function farkleAutoMs(normal = 2000, fast = 10_000): number {
+  const override = hooks().__FARKLE_AUTO_MS;
+  if (typeof override === "number" && Number.isFinite(override) && override >= 0) return override;
+  return isFast() ? fast : normal;
 }
 
 /** Next faces. Tests can preload `globalThis.__FARKLE_QUEUE`. */

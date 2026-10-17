@@ -15,7 +15,8 @@ import {
   toggleDie,
   type GameState,
 } from "./game";
-import { isFast, rollFaces } from "./random";
+import { playFarkleSound } from "./audio";
+import { farkleAutoMs, isFast, rollFaces } from "./random";
 import { formatPoints, OPENING_SCORE, SCORING_TABLE, scoringHints, WINNING_SCORE } from "./rules";
 
 const root = document.querySelector("#app");
@@ -32,6 +33,23 @@ const ui = {
   error: "",
 };
 let rollGen = 0;
+let farkleShowTimer = 0;
+let farkleAutoTimer = 0;
+
+function clearFarkleTimers(): void {
+  window.clearTimeout(farkleShowTimer);
+  window.clearTimeout(farkleAutoTimer);
+  farkleShowTimer = 0;
+  farkleAutoTimer = 0;
+}
+
+function dismissFarkle(): void {
+  if (state.phase !== "farkle") return;
+  clearFarkleTimers();
+  state = acknowledgeFarkle(state);
+  ui.farkleOn = false;
+  render();
+}
 
 function motion(normal: number, fast: number): number {
   return isFast() ? fast : normal;
@@ -380,7 +398,7 @@ function farkleOverlay(): string {
       <p class="farkle-word" id="farkle-word" data-testid="farkle-word">FARKLE</p>
       <p class="farkle-sub" data-testid="farkle-lost">${escapeHtml(detail)}</p>
     </div>
-    <button type="button" class="farkle-continue" data-testid="farkle-continue" data-action="farkle-next">Next player</button>
+    <button type="button" class="farkle-continue" data-testid="farkle-continue" data-action="farkle-next">Next player · auto in 2s</button>
   </div>`;
 }
 
@@ -411,12 +429,17 @@ function render(): void {
 }
 
 function afterLanding(): void {
+  clearFarkleTimers();
   ui.farkleOn = false;
   if (state.phase !== "farkle") return;
-  window.setTimeout(() => {
+  farkleShowTimer = window.setTimeout(() => {
     if (state.phase !== "farkle") return;
     ui.farkleOn = true;
+    playFarkleSound();
     render();
+    farkleAutoTimer = window.setTimeout(() => {
+      dismissFarkle();
+    }, farkleAutoMs());
   }, motion(450, 40));
 }
 
@@ -499,6 +522,7 @@ function onRollOff(): void {
 
 function onBank(): void {
   if (ui.rolling || !canBank(state).ok) return;
+  clearFarkleTimers();
   state = bank(state);
   ui.farkleOn = false;
   ui.error = "";
@@ -585,13 +609,11 @@ function onClick(event: MouseEvent): void {
     return;
   }
   if (action === "farkle-next") {
-    if (state.phase !== "farkle") return;
-    state = acknowledgeFarkle(state);
-    ui.farkleOn = false;
-    render();
+    dismissFarkle();
     return;
   }
   if (action === "again") {
+    clearFarkleTimers();
     state = createGame();
     ui.farkleOn = false;
     ui.rulesOpen = false;
