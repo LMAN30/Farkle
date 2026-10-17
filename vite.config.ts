@@ -6,10 +6,12 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 5173,
     strictPort: true,
+    allowedHosts: true,
   },
   preview: {
     host: "127.0.0.1",
     port: 4173,
+    allowedHosts: true,
   },
   plugins: [
     VitePWA({
@@ -18,7 +20,7 @@ export default defineConfig({
       manifest: false,
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
-        navigateFallback: "/index.html",
+        navigateFallback: "index.html",
       },
       devOptions: {
         enabled: false,
