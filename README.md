@@ -2,6 +2,8 @@
 
 Pass-and-play Farkle for two or more players on one screen. Scoring follows the PlayMonster rules.
 
+Works as a web app and as a full-screen **iPhone app** via Add to Home Screen.
+
 ## Start
 
 ```bash
@@ -10,6 +12,22 @@ npm run dev
 ```
 
 Open http://127.0.0.1:5173
+
+## Install on iPhone
+
+1. Deploy or open the site over **HTTPS** in **Safari** (required for home-screen apps).
+2. Tap the Share button.
+3. Choose **Add to Home Screen**, then **Add**.
+4. Open **Farkle** from your home screen — it launches full screen like a native app (no Safari chrome), works offline after the first visit, and uses the dice icon.
+
+On iPhone Safari you’ll also see a short in-app tip until you dismiss it.
+
+Production build:
+
+```bash
+npm run build
+npm run preview
+```
 
 ## Tests
 

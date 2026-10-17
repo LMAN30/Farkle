@@ -21,7 +21,7 @@ function bump(
     | "__FARKLE_BANK_SOUND"
     | "__FARKLE_OPENING_BANK_SOUND",
 ): void {
-  const hooks = globalThis as Record<string, number | undefined>;
+  const hooks = globalThis as unknown as Record<string, number | undefined>;
   hooks[hook] = (hooks[hook] ?? 0) + 1;
 }
 

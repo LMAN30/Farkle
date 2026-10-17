@@ -13,8 +13,10 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
+    "jsdom": "^29.1.1",
     "typescript": "^5.9.2",
     "vite": "^7.1.7",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^3.2.4"
   }
 }

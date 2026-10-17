@@ -25,8 +25,12 @@ import {
   startDiceRollSound,
   stopDiceRollSound,
 } from "./audio";
+import { dismissInstallHint, shouldShowInstallHint } from "./install";
 import { farkleAutoMs, isFast, rollFaces } from "./random";
 import { bestAvailableScore, formatPoints, OPENING_SCORE, SCORING_TABLE, scoringHints, WINNING_SCORE } from "./rules";
+import { registerSW } from "virtual:pwa-register";
+
+registerSW({ immediate: true });
 
 const root = document.querySelector("#app");
 if (!(root instanceof HTMLElement)) throw new Error("Missing #app");
@@ -40,6 +44,7 @@ const ui = {
   preview: null as number[] | null,
   farkleOn: false,
   error: "",
+  installHint: shouldShowInstallHint(),
 };
 let rollGen = 0;
 let farkleShowTimer = 0;
@@ -127,6 +132,14 @@ function syncNames(): void {
   names = Array.from(inputs, (input) => input.value);
 }
 
+function installBanner(): string {
+  if (!ui.installHint) return "";
+  return `<aside class="install-hint" data-testid="install-hint" role="note">
+    <p><strong>Add to Home Screen</strong> for a full-screen Farkle app on your iPhone: tap Share, then <em>Add to Home Screen</em>.</p>
+    <button type="button" class="text-btn install-dismiss" data-action="dismiss-install" data-testid="dismiss-install" aria-label="Dismiss">Got it</button>
+  </aside>`;
+}
+
 function header(): string {
   return `<header class="top">
     <div>
@@ -139,7 +152,8 @@ function header(): string {
         <path d="M8 8h8M8 12h8M8 16h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
       </svg>
     </button>
-  </header>`;
+  </header>
+  ${installBanner()}`;
 }
 
 function rulesModal(): string {
@@ -643,6 +657,12 @@ function onClick(event: MouseEvent): void {
   if (action === "noop") return;
   if (action === "rules") {
     ui.rulesOpen = !ui.rulesOpen;
+    render();
+    return;
+  }
+  if (action === "dismiss-install") {
+    dismissInstallHint();
+    ui.installHint = false;
     render();
     return;
   }
