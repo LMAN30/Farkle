@@ -159,7 +159,7 @@ test("highlights scoring dice, commits on roll or bank, and shakes on a Farkle",
   await page.getByTestId("rules-button").click();
   const modal = page.getByTestId("rules-modal");
   await expect(modal).toBeVisible();
-  for (const text of ["Single 1", "100", "Three 6s", "600", "Four of a kind", "1,000", "2,000", "3,000", "Straight 1–6", "Three pairs", "1,500", "Four of a kind with a pair", "Two triplets", "2,500", "Hot dice", "10,000", "500"]) {
+  for (const text of ["Single 1", "100", "Three 6s", "600", "Four of a kind", "1,000", "2,000", "3,000", "Straight 1–6", "Three pairs", "1,500", "Four of a kind with a pair", "Two triplets", "2,500", "Hot dice", "Roll off", "10,000", "500"]) {
     await expect(modal).toContainText(text);
   }
   await page.screenshot({ path: "/tmp/farkle-shots/rules.png" });
@@ -193,6 +193,32 @@ test("hot dice keeps the turn score and 10000 starts the last round", async ({ p
   await expect(page.getByTestId("current-player")).toContainText("Bo");
   await expect(page.locator("[data-name='Ada'] [data-testid='score-value']")).toHaveText("12,000");
   await page.screenshot({ path: "/tmp/farkle-shots/last-round.png" });
+});
+
+test("roll off continues leftover dice without risking the previous bank", async ({ page }) => {
+  await startMatch(page, ["Ada", "Bo"]);
+  await queue(page, [5, 5, 5, 2, 3, 4]);
+  await page.getByTestId("roll-button").click();
+  await waitSelect(page);
+  const tray = page.getByTestId("dice-tray");
+  for (let i = 0; i < 3; i += 1) await tray.locator("[data-value='5']").nth(i).click();
+  await page.getByTestId("bank-button").click();
+
+  await expect(page.getByTestId("current-player")).toContainText("Bo");
+  await expect(page.locator("[data-name='Ada'] [data-testid='score-value']")).toHaveText("500");
+  await expect(page.getByTestId("roll-off-leftover")).toBeVisible();
+  await expect(page.getByTestId("leftover-offer")).toContainText("500");
+  await expect(page.getByTestId("leftover-offer")).toContainText("Ada");
+
+  await queue(page, [2, 3, 4]);
+  await page.getByTestId("roll-off-leftover").click();
+  const overlay = page.getByTestId("farkle-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(page.getByTestId("farkle-lost")).toContainText("500");
+  await page.getByTestId("farkle-continue").click();
+  await expect(page.locator("[data-name='Ada'] [data-testid='score-value']")).toHaveText("500");
+  await expect(page.locator("[data-name='Bo'] [data-testid='score-value']")).toHaveText("0");
+  await expect(page.getByTestId("current-player")).toContainText("Ada");
 });
 
 test("farkle overlay auto-advances after the hold delay", async ({ page }) => {

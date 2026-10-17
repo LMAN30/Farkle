@@ -27,6 +27,14 @@ export interface LastRound {
   pending: boolean[];
 }
 
+/** Leftover dice after a bank — next player may roll them and continue that turn score. */
+export interface LeftoverOffer {
+  fromPlayer: number;
+  /** Turn total the previous player just banked (safe even if this roll-off Farkles). */
+  turnScore: number;
+  diceToRoll: number;
+}
+
 export interface GameState {
   players: Player[];
   current: number;
@@ -42,6 +50,8 @@ export interface GameState {
   lastRound: LastRound | null;
   winners: number[];
   rollOff: RollOff | null;
+  /** Present at the start of a turn when the previous player banked with leftover dice. */
+  leftoverOffer: LeftoverOffer | null;
   nextDieId: number;
   farkleLost: number;
 }
@@ -71,6 +81,7 @@ export function createGame(): GameState {
     lastRound: null,
     winners: [],
     rollOff: null,
+    leftoverOffer: null,
     nextDieId: 1,
     farkleLost: 0,
   };
@@ -140,7 +151,7 @@ export function beginPlay(state: GameState): GameState {
   return freshTurn({ ...state, rollOff: null }, state.rollOff.winner);
 }
 
-function freshTurn(state: GameState, current: number): GameState {
+function freshTurn(state: GameState, current: number, leftoverOffer: LeftoverOffer | null = null): GameState {
   return {
     ...state,
     current,
@@ -152,6 +163,41 @@ function freshTurn(state: GameState, current: number): GameState {
     hotDice: false,
     announce: null,
     farkleLost: 0,
+    leftoverOffer,
+  };
+}
+
+export function canAcceptLeftoverOffer(state: GameState): boolean {
+  return state.phase === "needRoll" && state.leftoverOffer !== null;
+}
+
+/** Take the previous player's leftover dice and turn score. Their banked points stay safe. */
+export function acceptLeftoverOffer(state: GameState): GameState {
+  if (!canAcceptLeftoverOffer(state) || !state.leftoverOffer) {
+    throw new Error("There is no leftover roll-off available.");
+  }
+  const offer = state.leftoverOffer;
+  const from = state.players[offer.fromPlayer]?.name ?? "The previous player";
+  return {
+    ...state,
+    leftoverOffer: null,
+    turnScore: offer.turnScore,
+    diceToRoll: offer.diceToRoll,
+    held: [],
+    hotDice: false,
+    announce: `${from} left ${offer.diceToRoll} ${offer.diceToRoll === 1 ? "die" : "dice"} with ${offer.turnScore.toLocaleString("en-US")} on the turn. Roll off to continue that score.`,
+  };
+}
+
+/** Decline the leftover offer and start a normal six-dice turn. */
+export function declineLeftoverOffer(state: GameState): GameState {
+  if (!state.leftoverOffer) return state;
+  return {
+    ...state,
+    leftoverOffer: null,
+    turnScore: 0,
+    diceToRoll: 6,
+    announce: null,
   };
 }
 
@@ -160,7 +206,7 @@ export function applyRoll(state: GameState, values: number[]): GameState {
   assertFaces(values, state.diceToRoll);
   let nextDieId = state.nextDieId;
   const dice: Die[] = values.map((value) => ({ id: nextDieId++, value, selected: false }));
-  const landed = { ...state, dice, nextDieId, hotDice: false };
+  const landed = { ...state, dice, nextDieId, hotDice: false, leftoverOffer: null };
   if (!hasScoringOption(values)) {
     return { ...landed, phase: "farkle", farkleLost: state.turnScore };
   }
@@ -260,19 +306,29 @@ export function commitAndRoll(state: GameState): GameState {
 export function bank(state: GameState): GameState {
   const gate = canBank(state);
   if (!gate.ok) throw new Error(gate.reason || "You cannot bank yet.");
-  const total = state.turnScore + selectionView(state).points;
+  const selection = selectionView(state);
+  const total = state.turnScore + selection.points;
+  const leftoverCount = state.dice.filter((die) => !die.selected).length;
+  const leftoverOffer: LeftoverOffer | null =
+    leftoverCount > 0
+      ? { fromPlayer: state.current, turnScore: total, diceToRoll: leftoverCount }
+      : null;
   const players = state.players.map((player, index) =>
     index === state.current ? { ...player, score: player.score + total, onBoard: true } : player,
   );
-  return finishTurn({ ...state, players }, state.current);
+  return finishTurn({ ...state, players }, state.current, leftoverOffer);
 }
 
 export function acknowledgeFarkle(state: GameState): GameState {
   if (state.phase !== "farkle") throw new Error("There is no Farkle to continue from.");
-  return finishTurn(state, null);
+  return finishTurn(state, null, null);
 }
 
-function finishTurn(state: GameState, bankingIndex: number | null): GameState {
+function finishTurn(
+  state: GameState,
+  bankingIndex: number | null,
+  leftoverOffer: LeftoverOffer | null,
+): GameState {
   if (bankingIndex !== null && bankingIndex !== state.current) {
     throw new Error("Only the current player can bank.");
   }
@@ -289,9 +345,9 @@ function finishTurn(state: GameState, bankingIndex: number | null): GameState {
     const round: LastRound = { triggeredBy: lastRound.triggeredBy, pending };
     const next = nextPending(state.current, pending);
     if (next === null) return endGame({ ...state, lastRound: round });
-    return freshTurn({ ...state, lastRound: round }, next);
+    return freshTurn({ ...state, lastRound: round }, next, leftoverOffer);
   }
-  return freshTurn(state, (state.current + 1) % state.players.length);
+  return freshTurn(state, (state.current + 1) % state.players.length, leftoverOffer);
 }
 
 function nextPending(from: number, pending: boolean[]): number | null {
@@ -315,6 +371,7 @@ function endGame(state: GameState): GameState {
     hotDice: false,
     announce: null,
     farkleLost: 0,
+    leftoverOffer: null,
     winners,
   };
 }

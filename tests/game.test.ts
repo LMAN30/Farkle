@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  acceptLeftoverOffer,
   acknowledgeFarkle,
   applyRoll,
   bank,
@@ -7,6 +8,7 @@ import {
   canBank,
   canSelectScoringDice,
   commitAndRoll,
+  declineLeftoverOffer,
   rollForFirst,
   selectScoringDice,
   selectionView,
@@ -189,6 +191,49 @@ describe("a turn", () => {
     state = commitAndRoll(state);
     expect(state.hotDice).toBe(true);
     expect(state.turnScore).toBe(450);
+    expect(state.diceToRoll).toBe(6);
+  });
+
+  it("offers a leftover roll-off that cannot wipe the previous bank", () => {
+    let state = beginWith(["Ada", "Bo"], 0);
+    state = applyRoll(state, [5, 5, 5, 2, 3, 4]);
+    state = selectValues(state, [5, 5, 5]);
+    state = bank(state);
+    expect(state.players[0]).toMatchObject({ score: 500, onBoard: true });
+    expect(state.current).toBe(1);
+    expect(state.leftoverOffer).toEqual({ fromPlayer: 0, turnScore: 500, diceToRoll: 3 });
+
+    state = acceptLeftoverOffer(state);
+    expect(state.leftoverOffer).toBeNull();
+    expect(state.turnScore).toBe(500);
+    expect(state.diceToRoll).toBe(3);
+
+    state = applyRoll(state, [2, 3, 4]);
+    expect(state.phase).toBe("farkle");
+    expect(state.farkleLost).toBe(500);
+    state = acknowledgeFarkle(state);
+    expect(state.players[0].score).toBe(500);
+    expect(state.players[1].score).toBe(0);
+    expect(state.current).toBe(0);
+  });
+
+  it("lets the next player decline leftovers and start with six dice", () => {
+    let state = beginWith(["Ada", "Bo"], 0);
+    state = applyRoll(state, [5, 5, 5, 2, 3, 4]);
+    state = selectValues(state, [5, 5, 5]);
+    state = bank(state);
+    state = declineLeftoverOffer(state);
+    expect(state.leftoverOffer).toBeNull();
+    expect(state.turnScore).toBe(0);
+    expect(state.diceToRoll).toBe(6);
+  });
+
+  it("does not offer a roll-off when every die was banked", () => {
+    let state = beginWith(["Ada", "Bo"], 0);
+    state = applyRoll(state, [1, 1, 1, 1, 1, 1]);
+    state = selectValues(state, [1, 1, 1, 1, 1, 1]);
+    state = bank(state);
+    expect(state.leftoverOffer).toBeNull();
     expect(state.diceToRoll).toBe(6);
   });
 

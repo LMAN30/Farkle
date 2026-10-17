@@ -1,13 +1,16 @@
 import {
+  acceptLeftoverOffer,
   acknowledgeFarkle,
   applyRoll,
   bank,
   beginPlay,
+  canAcceptLeftoverOffer,
   canBank,
   canRollRemaining,
   canSelectScoringDice,
   commitAndRoll,
   createGame,
+  declineLeftoverOffer,
   rollForFirst,
   selectScoringDice,
   selectionView,
@@ -159,6 +162,7 @@ function rulesModal(): string {
           <li>Set aside at least one scoring die after every roll. You choose which scoring dice to keep. A gold glow is only a hint.</li>
           <li>Only dice from the current roll form a combination. A 5 you already set aside does not join later 5s to make three of a kind.</li>
           <li>Hot dice: if you set aside every die, you may roll all six again and keep adding to this turn.</li>
+          <li>If you bank with dice left on the table, the next player may Roll off — take those leftover dice and continue your turn score. A Farkle on that attempt only drops their roll-off; your banked points stay.</li>
           <li>A roll with nothing you can score is a Farkle. You lose the points from this turn. Points already banked stay.</li>
           <li>The first time on the board, the turn must reach ${formatPoints(OPENING_SCORE)} before you stop. After that, you may bank any turn.</li>
           <li>At ${formatPoints(WINNING_SCORE)} or more, each other player gets one last turn. The highest score wins. A tie stands.</li>
@@ -289,7 +293,12 @@ function diceSection(): string {
       .join("")}</div>`;
   }
   const noun = state.diceToRoll === 1 ? "die" : "dice";
-  const prompt = state.hotDice ? "Hot dice. Roll all six." : `Roll ${state.diceToRoll} ${noun}.`;
+  let prompt = state.hotDice ? "Hot dice. Roll all six." : `Roll ${state.diceToRoll} ${noun}.`;
+  if (state.leftoverOffer) {
+    const left = state.leftoverOffer.diceToRoll;
+    const leftNoun = left === 1 ? "die" : "dice";
+    prompt = `${state.players[state.leftoverOffer.fromPlayer].name} left ${left} ${leftNoun}. Roll off that turn score, or start fresh with six.`;
+  }
   return `<div class="dice dice-empty" data-testid="dice-tray" data-rolling="false"><p class="cup">${prompt}</p></div>`;
 }
 
@@ -321,6 +330,15 @@ function selectionBlock(): string {
 function actions(): string {
   if (ui.rolling) return `<p class="rolling-label" data-testid="rolling-label">Rolling…</p>`;
   if (state.phase === "needRoll") {
+    if (state.leftoverOffer) {
+      const left = state.leftoverOffer.diceToRoll;
+      const leftNoun = left === 1 ? "die" : "dice";
+      return `<div class="actions">
+        <button type="button" class="primary" data-testid="roll-off-leftover" data-action="leftover-roll">Roll off</button>
+        <button type="button" class="secondary" data-testid="roll-button" data-action="decline-leftover">Roll 6 dice</button>
+      </div>
+      <p class="reason" data-testid="leftover-offer">Continue ${formatPoints(state.leftoverOffer.turnScore)} with ${left} ${leftNoun}. A Farkle only drops your attempt — ${escapeHtml(state.players[state.leftoverOffer.fromPlayer].name)} already banked.</p>`;
+    }
     const noun = state.diceToRoll === 1 ? "die" : "dice";
     return `<div class="actions"><button type="button" class="primary" data-testid="roll-button" data-action="roll">Roll ${state.diceToRoll} ${noun}</button></div>`;
   }
@@ -501,7 +519,7 @@ function playSelectionCombo(): void {
 }
 
 function onStartRoll(): void {
-  if (ui.rolling || state.phase !== "needRoll") return;
+  if (ui.rolling || state.phase !== "needRoll" || state.leftoverOffer) return;
   let values: number[];
   try {
     values = rollFaces(state.diceToRoll);
@@ -515,6 +533,39 @@ function onStartRoll(): void {
     playLandedCombo(values);
     afterLanding();
   });
+}
+
+function onLeftoverRoll(): void {
+  if (ui.rolling || !canAcceptLeftoverOffer(state)) return;
+  try {
+    state = acceptLeftoverOffer(state);
+  } catch (error) {
+    ui.error = error instanceof Error ? error.message : "Could not roll off.";
+    render();
+    return;
+  }
+  ui.error = "";
+  render();
+  let values: number[];
+  try {
+    values = rollFaces(state.diceToRoll);
+  } catch (error) {
+    ui.error = error instanceof Error ? error.message : "Could not roll.";
+    render();
+    return;
+  }
+  runAnimation(values, () => {
+    state = applyRoll(state, values);
+    playLandedCombo(values);
+    afterLanding();
+  });
+}
+
+function onDeclineLeftover(): void {
+  if (ui.rolling || !state.leftoverOffer) return;
+  state = declineLeftoverOffer(state);
+  ui.error = "";
+  onStartRoll();
 }
 
 function onCommitRoll(): void {
@@ -629,6 +680,14 @@ function onClick(event: MouseEvent): void {
   if (action === "roll") {
     if (state.phase === "needRoll") onStartRoll();
     else if (state.phase === "select") onCommitRoll();
+    return;
+  }
+  if (action === "leftover-roll") {
+    onLeftoverRoll();
+    return;
+  }
+  if (action === "decline-leftover") {
+    onDeclineLeftover();
     return;
   }
   if (action === "bank") {
